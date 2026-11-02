@@ -19,8 +19,8 @@ main{min-width:0}.topbar{height:72px;background:#fff;border-bottom:1px solid var
 </style>
 </head>
 <body>
-<div id="authGate" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:#f3f5f8"><div class="panel" style="width:min(440px,100%);padding:28px"><div class="brand" style="padding:0 0 20px;color:#182230"><div class="logo">🔧</div><div><b>AutoShop Pro</b><small style="color:#667085">Secure shop access</small></div></div><div id="authContent"></div></div></div>
-<div class="shell" id="appShell">
+<div id="authGate" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:#f3f5f8"><div class="panel" style="width:min(440px,100%);padding:28px"><div class="brand" style="padding:0 0 20px;color:#182230"><div class="logo">🔧</div><div><b>AutoShop Pro</b><small style="color:#667085">Secure shop access</small></div></div><div id="authContent"><div class="notice">Connecting securely to AutoShop Pro…</div></div></div></div>
+<div class="shell" id="appShell" style="display:none">
 <aside>
  <div class="brand"><div class="logo">🔧</div><div><b>AutoShop Pro</b><small>Shop management</small></div></div>
  <nav id="nav">
@@ -40,11 +40,18 @@ main{min-width:0}.topbar{height:72px;background:#fff;border-bottom:1px solid var
 </main>
 </div>
 <div class="modalback" id="modalback"><div class="modal"><div id="modalbody"></div></div></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script type="module">
+try {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  window.__autoShopSupabaseClient = createClient("https://hlprafqxfnlwgvchvukv.supabase.co", "sb_publishable_wC34Ftzul4vW5cAYGXrJjQ_xqwDuS3N");
+  window.dispatchEvent(new Event("autoshop-supabase-ready"));
+} catch (error) {
+  window.__autoShopSupabaseError = error;
+  window.dispatchEvent(new Event("autoshop-supabase-ready"));
+}
+</script>
 <script>
-const SUPABASE_URL="https://hlprafqxfnlwgvchvukv.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY="sb_publishable_wC34Ftzul4vW5cAYGXrJjQ_xqwDuS3N";
-const sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+let sbClient = null;
 let currentUser=null,shopId=null,syncTimer=null,syncing=false,cloudReady=false;
 const KEY='autoshoppro_v1';
 const blank={shop:{name:'Your Automotive Shop',phone:'',email:'',address:'',laborRate:125,taxRate:8.25},customers:[],vehicles:[],orders:[],parts:[]};
@@ -132,7 +139,12 @@ const orders=db.orders.map(o=>({id:o.id,shop_id:sid,ro_number:o.number,customer_
 $('#syncStatus').textContent='Synced';localStorage.setItem(KEY,JSON.stringify(db));}finally{syncing=false}}
 function showSyncError(err){$('#syncStatus').textContent='Sync error';console.error('AutoShop Pro sync error:',err);alert('Your change is saved on this device, but cloud sync failed: '+(err.message||err)+'. Check your connection and sign in again.');}
 
-initializeApp();
+window.addEventListener('autoshop-supabase-ready',()=>{
+ if(window.__autoShopSupabaseError){showAuth(`<h2>Unable to load secure connection</h2><div class="notice">The Supabase client library could not be loaded. Check your internet connection, then refresh this page. Details: ${esc(window.__autoShopSupabaseError.message||window.__autoShopSupabaseError)}</div><button class="btn primary" onclick="location.reload()">Try again</button>`);return;}
+ sbClient=window.__autoShopSupabaseClient;
+ if(!sbClient){showAuth(`<h2>Connection unavailable</h2><div class="notice">The secure connection library did not initialize. Refresh the page to try again.</div><button class="btn primary" onclick="location.reload()">Try again</button>`);return;}
+ initializeApp();
+},{once:true});
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
 </body></html>
