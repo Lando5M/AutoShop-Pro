@@ -42,9 +42,9 @@ main{min-width:0}.topbar{height:72px;background:#fff;border-bottom:1px solid var
 <div class="modalback" id="modalback"><div class="modal"><div id="modalbody"></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL="https://hlprafqxfnlwgvchvukv.sbClient.co";
+const SUPABASE_URL="https://hlprafqxfnlwgvchvukv.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_wC34Ftzul4vW5cAYGXrJjQ_xqwDuS3N";
-const sbClient=window.sbClient.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const sbClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let currentUser=null,shopId=null,syncTimer=null,syncing=false,cloudReady=false;
 const KEY='autoshoppro_v1';
 const blank={shop:{name:'Your Automotive Shop',phone:'',email:'',address:'',laborRate:125,taxRate:8.25},customers:[],vehicles:[],orders:[],parts:[]};
