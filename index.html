@@ -127,7 +127,30 @@ function editOrder(x){let o=db.orders.find(o=>o.id===x);let rows=(o.items||[]).m
 function printOrder(x){let o=db.orders.find(o=>o.id===x);if(!o)return;let c=db.customers.find(c=>c.id===o.customerId)||{},v=db.vehicles.find(v=>v.id===o.vehicleId)||{},win=window.open('','_blank');if(!win){alert('Please allow pop-ups to print this repair order.');return}let lines=(o.items||[]).map(it=>`<tr><td>${esc(it.kind)}</td><td>${esc(it.description)}</td><td>${Number(it.qty||0)}</td><td>${money(it.price)}</td><td>${money(Number(it.qty||0)*Number(it.price||0))}</td></tr>`).join('');win.document.write(`<!doctype html><html><head><title>${esc(o.number)}</title><style>body{font:14px Arial,sans-serif;color:#111;padding:28px}h1{margin:0 0 4px}h2{font-size:18px;margin-top:25px}small{color:#555}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0}table{width:100%;border-collapse:collapse;margin-top:15px}th,td{border-bottom:1px solid #ddd;text-align:left;padding:9px}th{background:#f3f4f6}.totals{width:300px;margin:20px 0 0 auto}.totals div{display:flex;justify-content:space-between;padding:5px}.grand{font-weight:bold;font-size:18px;border-top:2px solid #222}.sign{margin-top:55px;display:grid;grid-template-columns:1fr 1fr;gap:45px}.sign div{border-top:1px solid #222;padding-top:8px}@media print{button{display:none}}</style></head><body><h1>${esc(db.shop.name)}</h1><div>${esc(db.shop.address||'')} ${esc(db.shop.phone||'')}</div><h2>${o.status==='Completed'?'INVOICE':'REPAIR ORDER / ESTIMATE'} — ${esc(o.number)}</h2><div class="grid"><div><b>Customer</b><br>${esc(c.name||'')}<br>${esc(c.phone||'')}<br>${esc(c.email||'')}<br>${esc(c.address||'')}</div><div><b>Vehicle</b><br>${esc(vehicleName(o.vehicleId))}<br>VIN: ${esc(v.vin||'')}<br>Plate: ${esc(v.plate||'')}<br>Mileage: ${esc(v.mileage||'')}</div></div><p><b>Customer concern / requested work:</b><br>${esc(o.concern||'')}</p><table><thead><tr><th>Type</th><th>Description</th><th>Qty / hrs</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${lines}</tbody></table><div class="totals"><div><span>Subtotal</span><b>${money(o.subtotal)}</b></div><div><span>Discount</span><b>-${money(o.discount)}</b></div><div><span>Parts tax</span><b>${money(o.tax)}</b></div><div class="grand"><span>Total</span><b>${money(o.total)}</b></div></div><p>Work status: ${esc(o.status)} · Customer approval: ${esc(o.approvalStatus||'Not Requested')}</p><div class="sign"><div>Customer authorization / signature</div><div>Date</div></div><p><small>Printed from AutoShop Pro. This document is an estimate unless work is completed and invoiced. Confirm applicable taxes and customer authorization before work begins.</small></p><script>window.onload=()=>window.print();<\/script></body></html>`);win.document.close()}
 async function deleteOrder(x){if(!confirm('Delete this repair order?'))return;db.orders=db.orders.filter(o=>o.id!==x);closeModal();render();if(cloudReady){const {error}=await sbClient.from('repair_orders').delete().eq('id',x).eq('shop_id',shopId);if(error)showSyncError(error)}}
 function saveSettings(e){e.preventDefault();let o=Object.fromEntries(new FormData(e.target));Object.assign(db.shop,o);save();alert('Shop details saved.')}
-function saveRates(e){e.preventDefault();let o=Object.fromEntries(new FormData(e.target));db.shop.laborRate=Number(o.laborRate);db.shop.taxRate=Number(o.taxRate);save();alert('Pricing saved.');render()}
+async function saveRates(e){
+ e.preventDefault();
+ const o=Object.fromEntries(new FormData(e.target));
+ const laborRate=Number(o.laborRate),taxRate=Number(o.taxRate);
+ if(!Number.isFinite(laborRate)||laborRate<0||!Number.isFinite(taxRate)||taxRate<0){alert('Enter valid non-negative labor and tax rates.');return}
+ if(!sbClient||!shopId||!cloudReady){alert('Your shop is not connected to cloud sync yet. Please wait until the sync indicator says Synced, then try again.');return}
+ const previous={laborRate:db.shop.laborRate,taxRate:db.shop.taxRate};
+ clearTimeout(syncTimer);
+ db.shop.laborRate=laborRate;db.shop.taxRate=taxRate;
+ try{
+  const {data,error}=await sbClient.from('shops').update({labor_rate:laborRate,tax_rate:taxRate}).eq('id',shopId).select('id,labor_rate,tax_rate').maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('Supabase did not confirm an updated shop record. Check that your account has the owner or manager role for this shop.');
+  db.shop.laborRate=Number(data.labor_rate);db.shop.taxRate=Number(data.tax_rate);
+  localStorage.setItem(KEY,JSON.stringify(db));
+  $('#syncStatus').textContent='Synced';
+  alert('Default pricing saved to your cloud shop settings.');
+ }catch(err){
+  db.shop.laborRate=previous.laborRate;db.shop.taxRate=previous.taxRate;
+  localStorage.setItem(KEY,JSON.stringify(db));
+  $('#syncStatus').textContent='Sync error';
+  alert('Could not save default pricing to the cloud: '+(err.message||String(err)));
+ }
+}
 function filterTable(id,q){let x=$('#'+id);if(!x)return;q=q.toLowerCase();x.querySelectorAll('tbody tr').forEach(r=>r.style.display=(r.dataset.search||'').includes(q)?'':'none')}
 function filterStatus(s){$('#orderTable').querySelectorAll('tbody tr').forEach(r=>r.style.display=(!s||r.dataset.status===s)?'':'none')}
 function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='autoshop-pro-backup.json';a.click();URL.revokeObjectURL(a.href)}
